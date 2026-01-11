@@ -27,3 +27,6 @@ ha_automation_viz.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# Home Assistant sample
+automations.yaml

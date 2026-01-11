@@ -1,38 +1,8 @@
-"""Logging configuration with colored console output and file rotation."""
+"""Logging configuration with file rotation."""
 
 import logging
 from logging.handlers import RotatingFileHandler
-from colorama import init, Fore, Style
 from config import Config
-
-init(autoreset=True)
-
-
-class ColoredFormatter(logging.Formatter):
-    """Custom formatter with colored output for different log levels."""
-
-    COLORS = {
-        'DEBUG': Fore.CYAN,
-        'INFO': Fore.GREEN,
-        'WARNING': Fore.YELLOW,
-        'ERROR': Fore.RED,
-        'CRITICAL': Fore.RED + Style.BRIGHT,
-    }
-
-    def format(self, record):
-        """
-        Format log record with color based on level.
-
-        Args:
-            record: LogRecord instance
-
-        Returns:
-            str: Formatted and colored log message
-        """
-        log_color = self.COLORS.get(record.levelname, '')
-        record.levelname = f"{log_color}{record.levelname}{Style.RESET_ALL}"
-        record.name = f"{Fore.MAGENTA}{record.name}{Style.RESET_ALL}"
-        return super().format(record)
 
 
 def setup_logger(name):
@@ -52,10 +22,10 @@ def setup_logger(name):
     if logger.handlers:
         return logger
 
-    # Console handler with colors
+    # Console handler without colors
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.DEBUG)
-    console_formatter = ColoredFormatter(
+    console_formatter = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )

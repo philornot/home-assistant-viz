@@ -1,6 +1,8 @@
-"""Home Assistant API client with connection fallback."""
+"""Home Assistant API client with YAML file reading."""
 
 import requests
+import yaml
+from pathlib import Path
 from config import Config
 from logger_config import setup_logger
 
@@ -14,6 +16,8 @@ class HomeAssistantClient:
         """Initialize client with configuration."""
         self.token = Config.HA_TOKEN
         self.base_url = None
+        self._entity_names = {}  # Cache for entity_id -> friendly_name
+        self._device_names = {}  # Cache for device_id -> device_name
 
     def _get_working_url(self):
         """
@@ -51,15 +55,101 @@ class HomeAssistantClient:
         Returns:
             list: List of automation configurations
         """
+        # Try to read automations from YAML file first
+        yaml_path = Path(Config.AUTOMATIONS_YAML_PATH)
+        if yaml_path.exists():
+            logger.info(f"Reading automations from YAML file: {yaml_path}")
+
+            # First, fetch entity and device names from HA API
+            url = self._get_working_url()
+            if url:
+                self._fetch_entity_names(url)
+
+            automations = self._read_automations_from_yaml(yaml_path)
+
+            if automations:
+                logger.info(f"Successfully loaded {len(automations)} automations from YAML")
+                return automations
+            else:
+                logger.warning("No automations found in YAML file")
+        else:
+            logger.warning(f"YAML file not found at {yaml_path}")
+
+        # Fallback: try REST API (will show limited info)
         url = self._get_working_url()
         if not url:
             logger.error("No working URL available for Home Assistant")
             return []
 
-        headers = {"Authorization": f"Bearer {self.token}"}
+        logger.info("Falling back to REST API")
+        return self._fetch_via_rest_api(url)
 
+    def _read_automations_from_yaml(self, yaml_path):
+        """
+        Read automations from YAML file.
+
+        Args:
+            yaml_path (Path): Path to automations.yaml
+
+        Returns:
+            list: List of automation configurations
+        """
         try:
-            logger.debug("Fetching automation states from Home Assistant")
+            with open(yaml_path, 'r', encoding='utf-8') as f:
+                automations = yaml.safe_load(f)
+
+            if not automations:
+                logger.warning("YAML file is empty or invalid")
+                return []
+
+            logger.info(f"Loaded {len(automations)} automations from YAML file")
+
+            # Process automations to match expected format
+            processed = []
+            for auto in automations:
+                automation_id = auto.get('id', 'unknown')
+
+                # Enrich triggers, conditions, and actions with friendly names
+                triggers = self._enrich_with_names(
+                    self._ensure_list(auto.get('triggers', auto.get('trigger', [])))
+                )
+                conditions = self._enrich_with_names(
+                    self._ensure_list(auto.get('conditions', auto.get('condition', [])))
+                )
+                actions = self._enrich_with_names(
+                    self._ensure_list(auto.get('actions', auto.get('action', [])))
+                )
+
+                processed_auto = {
+                    'id': automation_id,
+                    'alias': auto.get('alias', f'Automation {automation_id}'),
+                    'entity_id': f"automation.{automation_id}",
+                    'trigger': triggers,
+                    'condition': conditions,
+                    'action': actions
+                }
+
+                logger.debug(f"Loaded: {processed_auto['alias']} ({len(triggers)} triggers, {len(conditions)} conditions, {len(actions)} actions)")
+                processed.append(processed_auto)
+
+            return processed
+
+        except Exception as e:
+            logger.error(f"Error reading YAML file: {e}", exc_info=True)
+            return []
+
+    def _fetch_via_rest_api(self, url):
+        """
+        Fallback method to fetch automations via REST API.
+
+        Args:
+            url (str): Home Assistant URL
+
+        Returns:
+            list: List of automations with limited info
+        """
+        try:
+            headers = {"Authorization": f"Bearer {self.token}"}
             response = requests.get(
                 f"{url}/api/states",
                 headers=headers,
@@ -67,124 +157,138 @@ class HomeAssistantClient:
             )
 
             if response.status_code != 200:
-                logger.error(f"Failed to fetch states: HTTP {response.status_code}")
                 return []
 
             states = response.json()
-            logger.debug(f"Received {len(states)} total states from Home Assistant")
-
-            # Filter for automation entities that are enabled
             automation_states = [
                 s for s in states
                 if s.get('entity_id', '').startswith('automation.')
                 and s.get('state') == 'on'
             ]
-            logger.info(f"Found {len(automation_states)} enabled automations")
 
-            if not automation_states:
-                logger.warning("No enabled automations found in Home Assistant")
-                return []
+            automations = []
+            for state in automation_states:
+                entity_id = state.get('entity_id', '')
+                attributes = state.get('attributes', {})
 
-            # Convert state objects to automation configs
-            detailed_automations = []
-            for idx, auto_state in enumerate(automation_states):
-                entity_id = auto_state.get('entity_id', 'unknown')
-                attributes = auto_state.get('attributes', {})
-
-                logger.debug(f"Processing automation {idx + 1}/{len(automation_states)}: {entity_id}")
-
-                # Extract automation details from attributes
-                automation_config = {
+                automations.append({
                     'alias': attributes.get('friendly_name', entity_id),
                     'entity_id': entity_id,
-                    'trigger': self._extract_triggers(attributes),
-                    'condition': self._extract_conditions(attributes),
-                    'action': self._extract_actions(attributes)
-                }
+                    'trigger': [{
+                        'platform': 'unknown',
+                        'entity_id': 'Config not accessible - check YAML path'
+                    }],
+                    'condition': [],
+                    'action': [{
+                        'service': 'unknown'
+                    }]
+                })
 
-                logger.debug(f"  - Name: {automation_config['alias']}")
-                logger.debug(f"  - Triggers: {len(automation_config['trigger'])} found")
-                logger.debug(f"  - Conditions: {len(automation_config['condition'])} found")
-                logger.debug(f"  - Actions: {len(automation_config['action'])} found")
+            return automations
 
-                detailed_automations.append(automation_config)
-
-            logger.info(f"Successfully processed {len(detailed_automations)} automations")
-            return detailed_automations
-
-        except requests.exceptions.Timeout:
-            logger.error("Request to Home Assistant timed out")
-            return []
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Request error while fetching automations: {e}")
-            return []
         except Exception as e:
-            logger.error(f"Unexpected error while fetching automations: {e}", exc_info=True)
+            logger.error(f"Error fetching via REST API: {e}")
             return []
 
-    def _extract_triggers(self, attributes):
+    def _fetch_entity_names(self, url):
         """
-        Extract trigger information from automation attributes.
+        Fetch all entity and device names from Home Assistant.
 
         Args:
-            attributes (dict): Automation attributes from HA state
-
-        Returns:
-            list: List of trigger configurations
+            url (str): Home Assistant URL
         """
-        # Try to get trigger from attributes
-        triggers = []
+        try:
+            headers = {"Authorization": f"Bearer {self.token}"}
 
-        # Check if last_triggered exists as a hint that automation has triggers
-        if 'last_triggered' in attributes:
-            # Create a generic trigger representation
-            triggers.append({
-                'platform': 'state',
-                'entity_id': attributes.get('entity_id', 'unknown')
-            })
+            logger.debug("Fetching entity names from Home Assistant API")
 
-        # If no triggers found, add a placeholder
-        if not triggers:
-            triggers.append({
-                'platform': 'unknown',
-                'entity_id': ''
-            })
+            # Get all states (contains entity_id -> friendly_name mapping)
+            response = requests.get(
+                f"{url}/api/states",
+                headers=headers,
+                timeout=5
+            )
 
-        return triggers
+            if response.status_code == 200:
+                states = response.json()
+                logger.debug(f"Received {len(states)} states from API")
 
-    def _extract_conditions(self, attributes):
+                for state in states:
+                    entity_id = state.get('entity_id', '')
+                    attributes = state.get('attributes', {})
+                    friendly_name = attributes.get('friendly_name', entity_id)
+
+                    if entity_id:
+                        self._entity_names[entity_id] = friendly_name
+                        logger.debug(f"Mapped: {entity_id} -> {friendly_name}")
+
+                logger.info(f"Cached {len(self._entity_names)} entity names")
+            else:
+                logger.warning(f"Failed to fetch entity names: HTTP {response.status_code}")
+
+        except Exception as e:
+            logger.warning(f"Error fetching entity names: {e}")
+
+    def _enrich_with_names(self, items):
         """
-        Extract condition information from automation attributes.
+        Enrich triggers/conditions/actions with friendly names.
 
         Args:
-            attributes (dict): Automation attributes from HA state
+            items (list): List of trigger/condition/action dicts
 
         Returns:
-            list: List of condition configurations
+            list: Enriched items
         """
-        # Home Assistant doesn't expose conditions in state attributes
-        # Return empty list - conditions are optional
-        return []
+        enriched = []
 
-    def _extract_actions(self, attributes):
+        for item in items:
+            if not isinstance(item, dict):
+                enriched.append(item)
+                continue
+
+            # Create a copy to avoid modifying original
+            enriched_item = item.copy()
+
+            # Add friendly name for entity_id
+            entity_id = item.get('entity_id')
+            if entity_id:
+                logger.debug(f"Looking up entity_id: {entity_id}")
+                if entity_id in self._entity_names:
+                    friendly = self._entity_names[entity_id]
+                    enriched_item['_friendly_name'] = friendly
+                    logger.debug(f"  Found friendly name: {friendly}")
+                else:
+                    logger.debug(f"  No friendly name found for {entity_id}")
+
+            # Handle targets (can have entity_id inside)
+            target = item.get('target', {})
+            if isinstance(target, dict) and 'entity_id' in target:
+                target_entity = target['entity_id']
+                logger.debug(f"Looking up target entity_id: {target_entity}")
+                if target_entity in self._entity_names:
+                    friendly = self._entity_names[target_entity]
+                    enriched_item['_target_friendly_name'] = friendly
+                    logger.debug(f"  Found target friendly name: {friendly}")
+                else:
+                    logger.debug(f"  No friendly name found for target {target_entity}")
+
+            enriched.append(enriched_item)
+
+        return enriched
+
+    def _ensure_list(self, item):
         """
-        Extract action information from automation attributes.
+        Convert item to list if it isn't already.
 
         Args:
-            attributes (dict): Automation attributes from HA state
+            item: Item to convert
 
         Returns:
-            list: List of action configurations
+            list: Item as list
         """
-        actions = []
-
-        # Try to infer action type from automation mode
-        mode = attributes.get('mode', 'single')
-
-        # Create a generic action representation
-        actions.append({
-            'service': 'automation.trigger',
-            'mode': mode
-        })
-
-        return actions
+        if isinstance(item, list):
+            return item
+        elif item:
+            return [item]
+        else:
+            return []

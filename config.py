@@ -18,6 +18,12 @@ class Config:
     HA_PORT = int(os.getenv("HA_PORT", "8123"))
     HA_TOKEN = os.getenv("HA_TOKEN", "")
 
+    # Path to automations.yaml file
+    AUTOMATIONS_YAML_PATH = os.getenv(
+        "AUTOMATIONS_YAML_PATH",
+        "/opt/homeassistant/automations.yaml"
+    )
+
     # Flask settings
     FLASK_HOST = "0.0.0.0"
     FLASK_PORT = int(os.getenv("FLASK_PORT", "5001"))
