@@ -53,52 +53,138 @@ class HomeAssistantClient:
         """
         url = self._get_working_url()
         if not url:
+            logger.error("No working URL available for Home Assistant")
             return []
 
         headers = {"Authorization": f"Bearer {self.token}"}
 
         try:
-            # First, try to get automations via states API
+            logger.debug("Fetching automation states from Home Assistant")
             response = requests.get(
                 f"{url}/api/states",
                 headers=headers,
                 timeout=5
             )
 
-            if response.status_code == 200:
-                states = response.json()
-                # Filter for automation entities
-                automations = [
-                    s for s in states
-                    if s.get('entity_id', '').startswith('automation.')
-                    and s.get('state') == 'on'
-                ]
-                logger.info(f"Fetched {len(automations)} enabled automations from states")
-
-                # Get detailed automation configs
-                detailed_automations = []
-                for auto in automations:
-                    entity_id = auto['entity_id']
-                    # Try to get automation config
-                    config_response = requests.get(
-                        f"{url}/api/config/automation/config/{entity_id}",
-                        headers=headers,
-                        timeout=3
-                    )
-                    if config_response.status_code == 200:
-                        detailed_automations.append(config_response.json())
-                    else:
-                        # Fallback to using attributes from state
-                        detailed_automations.append({
-                            'alias': auto['attributes'].get('friendly_name', entity_id),
-                            'trigger': auto['attributes'].get('last_triggered', []),
-                            'action': [{'service': 'unknown'}]
-                        })
-
-                return detailed_automations
-            else:
-                logger.error(f"Error fetching automations: {response.status_code}")
+            if response.status_code != 200:
+                logger.error(f"Failed to fetch states: HTTP {response.status_code}")
                 return []
-        except Exception as e:
-            logger.error(f"Exception while fetching automations: {e}")
+
+            states = response.json()
+            logger.debug(f"Received {len(states)} total states from Home Assistant")
+
+            # Filter for automation entities that are enabled
+            automation_states = [
+                s for s in states
+                if s.get('entity_id', '').startswith('automation.')
+                and s.get('state') == 'on'
+            ]
+            logger.info(f"Found {len(automation_states)} enabled automations")
+
+            if not automation_states:
+                logger.warning("No enabled automations found in Home Assistant")
+                return []
+
+            # Convert state objects to automation configs
+            detailed_automations = []
+            for idx, auto_state in enumerate(automation_states):
+                entity_id = auto_state.get('entity_id', 'unknown')
+                attributes = auto_state.get('attributes', {})
+
+                logger.debug(f"Processing automation {idx + 1}/{len(automation_states)}: {entity_id}")
+
+                # Extract automation details from attributes
+                automation_config = {
+                    'alias': attributes.get('friendly_name', entity_id),
+                    'entity_id': entity_id,
+                    'trigger': self._extract_triggers(attributes),
+                    'condition': self._extract_conditions(attributes),
+                    'action': self._extract_actions(attributes)
+                }
+
+                logger.debug(f"  - Name: {automation_config['alias']}")
+                logger.debug(f"  - Triggers: {len(automation_config['trigger'])} found")
+                logger.debug(f"  - Conditions: {len(automation_config['condition'])} found")
+                logger.debug(f"  - Actions: {len(automation_config['action'])} found")
+
+                detailed_automations.append(automation_config)
+
+            logger.info(f"Successfully processed {len(detailed_automations)} automations")
+            return detailed_automations
+
+        except requests.exceptions.Timeout:
+            logger.error("Request to Home Assistant timed out")
             return []
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request error while fetching automations: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error while fetching automations: {e}", exc_info=True)
+            return []
+
+    def _extract_triggers(self, attributes):
+        """
+        Extract trigger information from automation attributes.
+
+        Args:
+            attributes (dict): Automation attributes from HA state
+
+        Returns:
+            list: List of trigger configurations
+        """
+        # Try to get trigger from attributes
+        triggers = []
+
+        # Check if last_triggered exists as a hint that automation has triggers
+        if 'last_triggered' in attributes:
+            # Create a generic trigger representation
+            triggers.append({
+                'platform': 'state',
+                'entity_id': attributes.get('entity_id', 'unknown')
+            })
+
+        # If no triggers found, add a placeholder
+        if not triggers:
+            triggers.append({
+                'platform': 'unknown',
+                'entity_id': ''
+            })
+
+        return triggers
+
+    def _extract_conditions(self, attributes):
+        """
+        Extract condition information from automation attributes.
+
+        Args:
+            attributes (dict): Automation attributes from HA state
+
+        Returns:
+            list: List of condition configurations
+        """
+        # Home Assistant doesn't expose conditions in state attributes
+        # Return empty list - conditions are optional
+        return []
+
+    def _extract_actions(self, attributes):
+        """
+        Extract action information from automation attributes.
+
+        Args:
+            attributes (dict): Automation attributes from HA state
+
+        Returns:
+            list: List of action configurations
+        """
+        actions = []
+
+        # Try to infer action type from automation mode
+        mode = attributes.get('mode', 'single')
+
+        # Create a generic action representation
+        actions.append({
+            'service': 'automation.trigger',
+            'mode': mode
+        })
+
+        return actions
