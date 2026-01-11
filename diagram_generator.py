@@ -1,165 +1,222 @@
-"""Flowchart diagram generation using Graphviz."""
+"""HTML diagram generation for automation workflows."""
 
-from graphviz import Digraph
 from logger_config import setup_logger
 
 logger = setup_logger(__name__)
 
 
 class DiagramGenerator:
-    """Generate flowchart diagrams from automation configurations."""
-
-    COLORS = {
-        'automation': '#4a90e2',
-        'trigger': '#50c878',
-        'condition': '#ff9f43',
-        'action': '#ee5a6f',
-        'background': '#1e1e1e'
-    }
+    """Generate HTML diagrams from automation configurations."""
 
     def create_flowchart(self, automations):
         """
-        Create flowchart diagram from automations.
+        Create HTML flowchart from automations.
 
         Args:
             automations (list): List of automation configurations
 
         Returns:
-            str: SVG representation of the flowchart
+            str: HTML representation of the flowcharts
         """
-        logger.info(f"Generating flowchart for {len(automations)} automations")
+        logger.info(f"Generating HTML diagrams for {len(automations)} automations")
 
-        dot = Digraph(comment='HA Automations', format='svg')
-        dot.attr(rankdir='TB', bgcolor=self.COLORS['background'])
-        dot.attr('node', style='filled', fontname='Arial', fontcolor='white')
-        dot.attr('edge', color='white', fontcolor='white', fontname='Arial')
+        html_parts = ['<div class="diagrams-container">']
 
         for idx, automation in enumerate(automations):
-            self._process_automation(dot, idx, automation)
+            html_parts.append(self._create_automation_diagram(idx, automation))
 
-        svg = dot.pipe(encoding='utf-8')
-        logger.debug("Flowchart generated successfully")
-        return svg
+        html_parts.append('</div>')
 
-    def _process_automation(self, dot, idx, automation):
+        html = ''.join(html_parts)
+        logger.debug("HTML diagrams generated successfully")
+        return html
+
+    def _create_automation_diagram(self, idx, automation):
         """
-        Process single automation and add to diagram.
+        Create HTML diagram for single automation.
 
         Args:
-            dot: Graphviz Digraph object
             idx (int): Automation index
             automation (dict): Automation configuration
+
+        Returns:
+            str: HTML for single automation diagram
         """
-        auto_id = f"auto_{idx}"
         name = automation.get("alias", f"Automation {idx}")
-
-        # Automation name node
-        dot.node(
-            auto_id,
-            name,
-            shape='box',
-            style='rounded,filled',
-            fillcolor=self.COLORS['automation']
-        )
-
-        # Process triggers
         triggers = self._ensure_list(automation.get("trigger", []))
-        last_node = self._add_triggers(dot, auto_id, triggers)
-
-        # Process conditions
         conditions = self._ensure_list(automation.get("condition", []))
-        if conditions:
-            last_node = self._add_conditions(dot, auto_id, conditions, last_node)
-
-        # Process actions
         actions = self._ensure_list(automation.get("action", []))
-        self._add_actions(dot, auto_id, actions, last_node, bool(conditions))
+
+        html = f'''
+        <div class="automation-flow">
+            <div class="flow-header">
+                <h3 class="automation-name">{self._escape_html(name)}</h3>
+            </div>
+            <div class="flow-body">
+        '''
+
+        # Add triggers
+        if triggers:
+            html += '<div class="flow-section">'
+            html += '<h4 class="section-label">Triggers</h4>'
+            html += '<div class="flow-items">'
+            for trigger in triggers:
+                html += self._create_trigger_node(trigger)
+            html += '</div></div>'
+            html += '<div class="flow-arrow">↓</div>'
+
+        # Add conditions
+        if conditions:
+            html += '<div class="flow-section">'
+            html += '<h4 class="section-label">Conditions</h4>'
+            html += '<div class="flow-items">'
+            for condition in conditions:
+                html += self._create_condition_node(condition)
+            html += '</div></div>'
+            html += '<div class="flow-arrow">↓ yes</div>'
+
+        # Add actions
+        if actions:
+            html += '<div class="flow-section">'
+            html += '<h4 class="section-label">Actions</h4>'
+            html += '<div class="flow-items">'
+            for action in actions:
+                html += self._create_action_node(action)
+            html += '</div></div>'
+
+        html += '''
+            </div>
+        </div>
+        '''
+
+        return html
+
+    def _create_trigger_node(self, trigger):
+        """
+        Create HTML for trigger node.
+
+        Args:
+            trigger: Trigger configuration
+
+        Returns:
+            str: HTML for trigger node
+        """
+        if isinstance(trigger, dict):
+            trigger_type = trigger.get("platform", "unknown")
+            entity_id = trigger.get("entity_id", "")
+            label = f"{trigger_type}"
+            sublabel = f"<div class='node-sublabel'>{self._escape_html(entity_id)}</div>" if entity_id else ""
+        elif isinstance(trigger, str):
+            label = self._truncate(trigger, 30)
+            sublabel = ""
+        else:
+            label = type(trigger).__name__
+            sublabel = ""
+
+        return f'''
+        <div class="flow-node trigger-node">
+            <div class="node-icon">▶</div>
+            <div class="node-content">
+                <div class="node-label">{self._escape_html(label)}</div>
+                {sublabel}
+            </div>
+        </div>
+        '''
+
+    def _create_condition_node(self, condition):
+        """
+        Create HTML for condition node.
+
+        Args:
+            condition: Condition configuration
+
+        Returns:
+            str: HTML for condition node
+        """
+        if isinstance(condition, dict):
+            condition_type = condition.get("condition", "unknown")
+            label = condition_type
+        elif isinstance(condition, str):
+            label = self._truncate(condition, 30)
+        else:
+            label = type(condition).__name__
+
+        return f'''
+        <div class="flow-node condition-node">
+            <div class="node-icon">◆</div>
+            <div class="node-content">
+                <div class="node-label">{self._escape_html(label)}</div>
+            </div>
+        </div>
+        '''
+
+    def _create_action_node(self, action):
+        """
+        Create HTML for action node.
+
+        Args:
+            action: Action configuration
+
+        Returns:
+            str: HTML for action node
+        """
+        if isinstance(action, dict):
+            action_type = action.get("service", action.get("action", "unknown"))
+            label = action_type
+        elif isinstance(action, str):
+            label = self._truncate(action, 30)
+        else:
+            label = type(action).__name__
+
+        return f'''
+        <div class="flow-node action-node">
+            <div class="node-icon">●</div>
+            <div class="node-content">
+                <div class="node-label">{self._escape_html(label)}</div>
+            </div>
+        </div>
+        '''
 
     def _ensure_list(self, item):
-        """Convert item to list if it isn't already."""
+        """
+        Convert item to list if it isn't already.
+
+        Args:
+            item: Item to convert
+
+        Returns:
+            list: Item as list
+        """
         return item if isinstance(item, list) else [item] if item else []
 
-    def _add_triggers(self, dot, auto_id, triggers):
-        """Add trigger nodes to diagram."""
-        if not triggers:
-            return auto_id
+    def _truncate(self, text, max_length):
+        """
+        Truncate text to max length.
 
-        for t_idx, trigger in enumerate(triggers):
-            trigger_id = f"{auto_id}_trigger_{t_idx}"
+        Args:
+            text (str): Text to truncate
+            max_length (int): Maximum length
 
-            # Handle different trigger formats
-            if isinstance(trigger, dict):
-                trigger_type = trigger.get("platform", "unknown")
-                label = f"Trigger: {trigger_type}"
+        Returns:
+            str: Truncated text
+        """
+        if len(text) <= max_length:
+            return text
+        return text[:max_length - 3] + '...'
 
-                if "entity_id" in trigger:
-                    label += f"\n{trigger['entity_id']}"
-            elif isinstance(trigger, str):
-                # Trigger is just a string (timestamp or simple value)
-                label = f"Trigger: {trigger[:30]}"  # Limit length
-            else:
-                label = f"Trigger: {type(trigger).__name__}"
+    def _escape_html(self, text):
+        """
+        Escape HTML special characters.
 
-            dot.node(
-                trigger_id,
-                label,
-                shape='parallelogram',
-                fillcolor=self.COLORS['trigger']
-            )
-            dot.edge(auto_id, trigger_id)
+        Args:
+            text (str): Text to escape
 
-        return f"{auto_id}_trigger_{len(triggers)-1}" if triggers else auto_id
-
-    def _add_conditions(self, dot, auto_id, conditions, last_node):
-        """Add condition nodes to diagram."""
-        if not conditions:
-            return last_node
-
-        for c_idx, condition in enumerate(conditions):
-            condition_id = f"{auto_id}_condition_{c_idx}"
-
-            # Handle different condition formats
-            if isinstance(condition, dict):
-                condition_type = condition.get("condition", "unknown")
-                label = f"Condition: {condition_type}"
-            elif isinstance(condition, str):
-                label = f"Condition: {condition[:30]}"
-            else:
-                label = f"Condition: {type(condition).__name__}"
-
-            dot.node(
-                condition_id,
-                label,
-                shape='diamond',
-                fillcolor=self.COLORS['condition']
-            )
-            dot.edge(last_node, condition_id)
-
-        return f"{auto_id}_condition_{len(conditions)-1}"
-
-    def _add_actions(self, dot, auto_id, actions, last_node, has_conditions):
-        """Add action nodes to diagram."""
-        if not actions:
-            return
-
-        for a_idx, action in enumerate(actions):
-            action_id = f"{auto_id}_action_{a_idx}"
-
-            # Handle different action formats
-            if isinstance(action, dict):
-                action_type = action.get("service", action.get("action", "unknown"))
-                label = f"Action: {action_type}"
-            elif isinstance(action, str):
-                label = f"Action: {action[:30]}"
-            else:
-                label = f"Action: {type(action).__name__}"
-
-            dot.node(
-                action_id,
-                label,
-                shape='box',
-                fillcolor=self.COLORS['action']
-            )
-
-            edge_label = "yes" if has_conditions else ""
-            dot.edge(last_node, action_id, label=edge_label)
+        Returns:
+            str: Escaped text
+        """
+        return (str(text)
+                .replace('&', '&amp;')
+                .replace('<', '&lt;')
+                .replace('>', '&gt;')
+                .replace('"', '&quot;')
+                .replace("'", '&#39;'))

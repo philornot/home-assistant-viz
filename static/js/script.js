@@ -11,7 +11,7 @@ async function fetchDiagram() {
         const data = await response.json();
 
         if (data.success) {
-            container.innerHTML = data.svg;
+            container.innerHTML = data.html;
             status.textContent = `Last updated: ${new Date().toLocaleTimeString()} (${data.count} automations)`;
         } else {
             container.innerHTML = `<p class="loading">${data.message}</p>`;

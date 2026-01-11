@@ -1,10 +1,12 @@
 # Home Assistant Automation Visualizer
 
-Visualize your Home Assistant automations as interactive flowchart diagrams.
+Visualize your Home Assistant automations as interactive, responsive HTML diagrams.
 
 ## Features
 
 - Real-time automation workflow visualization
+- Responsive HTML/CSS layout - works on any screen size
+- Each automation displayed as a separate, interactive card
 - Auto-refresh every 30 seconds
 - Connection fallback support
 - Colored logging with file rotation
@@ -22,10 +24,6 @@ python -m venv venv
 # Install dependencies
 pip install -r requirements.txt
 
-# Install Graphviz (required)
-# Download from: https://graphviz.org/download/
-# Or: choco install graphviz
-
 # Configure - create .env file
 Copy-Item .env.example .env
 # Edit .env with your HA token
@@ -37,10 +35,6 @@ python app.py
 ### Production (Raspberry Pi)
 
 ```bash
-# Install system dependencies
-sudo apt-get update
-sudo apt-get install graphviz
-
 # Setup Python environment
 python3 -m venv venv
 source venv/bin/activate
@@ -71,6 +65,8 @@ Get your HA token: Settings → People → Your User → Security → Long-Lived
 ## Usage
 
 Access the visualizer at `http://localhost:5001` (or your RPi IP).
+
+The page will automatically refresh every 30 seconds, or click "Refresh Now" for manual updates.
 
 ## Port Check
 

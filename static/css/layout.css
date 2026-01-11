@@ -14,19 +14,18 @@ header {
 h1 {
     text-align: center;
     color: var(--color-automation);
-    font-size: var(--font-size-lg);
+    font-size: 28px;
     margin: 0;
 }
 
 .container {
     max-width: 100%;
-    overflow-x: auto;
-    background-color: var(--color-bg-secondary);
-    padding: var(--spacing-lg);
-    border-radius: var(--radius-md);
+    min-height: 200px;
 }
 
 .loading {
     text-align: center;
     color: var(--color-text-secondary);
+    padding: var(--spacing-xl);
+    font-size: var(--font-size-lg);
 }

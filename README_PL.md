@@ -1,10 +1,12 @@
 # Home Assistant Automation Visualizer
 
-Wizualizuj swoje automatyzacje Home Assistant jako interaktywne diagramy przepływu.
+Wizualizuj swoje automatyzacje Home Assistant jako interaktywne, responsywne diagramy HTML.
 
 ## Funkcje
 
 - Wizualizacja workflow automatyzacji w czasie rzeczywistym
+- Responsywny układ HTML/CSS - działa na każdym ekranie
+- Każda automatyzacja wyświetlana jako osobna, interaktywna karta
 - Auto-odświeżanie co 30 sekund
 - Obsługa fallbacku połączeń
 - Kolorowe logi z rotacją plików
@@ -22,10 +24,6 @@ python -m venv venv
 # Zainstaluj zależności
 pip install -r requirements.txt
 
-# Zainstaluj Graphviz (wymagane)
-# Pobierz z: https://graphviz.org/download/
-# Lub: choco install graphviz
-
 # Konfiguracja - utwórz plik .env
 Copy-Item .env.example .env
 # Edytuj .env i wpisz swój token z HA
@@ -37,10 +35,6 @@ python app.py
 ### Produkcja (Raspberry Pi)
 
 ```bash
-# Zainstaluj zależności systemowe
-sudo apt-get update
-sudo apt-get install graphviz
-
 # Środowisko Python
 python3 -m venv venv
 source venv/bin/activate
@@ -71,6 +65,8 @@ Jak uzyskać token HA: Ustawienia → Osoby → Twój użytkownik → Bezpiecze�
 ## Użycie
 
 Otwórz w przeglądarce `http://localhost:5001` (lub IP Twojego RPi).
+
+Strona automatycznie odświeża się co 30 sekund, lub kliknij "Refresh Now" dla ręcznej aktualizacji.
 
 ## Sprawdzanie portów
 

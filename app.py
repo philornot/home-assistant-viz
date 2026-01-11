@@ -1,9 +1,10 @@
 """Main Flask application."""
 
 from flask import Flask, render_template, jsonify
+
 from config import Config
-from ha_client import HomeAssistantClient
 from diagram_generator import DiagramGenerator
+from ha_client import HomeAssistantClient
 from logger_config import setup_logger
 
 logger = setup_logger(__name__)
@@ -23,10 +24,10 @@ def index():
 @app.route('/api/diagram')
 def get_diagram():
     """
-    API endpoint to fetch current automation diagram.
+    API endpoint to fetch current automation diagrams.
 
     Returns:
-        JSON response with SVG content or error
+        JSON response with HTML content or error
     """
     logger.debug("Diagram API called")
 
@@ -38,10 +39,10 @@ def get_diagram():
             'message': 'No automations found or cannot connect to Home Assistant'
         })
 
-    svg_content = diagram_gen.create_flowchart(automations)
+    html_content = diagram_gen.create_flowchart(automations)
     return jsonify({
         'success': True,
-        'svg': svg_content,
+        'html': html_content,
         'count': len(automations)
     })
 
