@@ -1,0 +1,64 @@
+.legend {
+    background-color: var(--color-bg-secondary);
+    padding: var(--spacing-md);
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--spacing-lg);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-lg);
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+}
+
+.legend-color {
+    width: 20px;
+    height: 20px;
+    border-radius: 3px;
+}
+
+.legend-automation {
+    background-color: var(--color-automation);
+}
+
+.legend-trigger {
+    background-color: var(--color-trigger);
+}
+
+.legend-condition {
+    background-color: var(--color-condition);
+}
+
+.legend-action {
+    background-color: var(--color-action);
+}
+
+.refresh-btn {
+    background-color: var(--color-automation);
+    color: var(--color-text-primary);
+    border: none;
+    padding: var(--spacing-sm) var(--spacing-lg);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: var(--font-size-base);
+    transition: background-color var(--transition-fast);
+}
+
+.refresh-btn:hover {
+    background-color: var(--color-automation-hover);
+}
+
+.refresh-btn:active {
+    transform: scale(0.98);
+}
+
+.status {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    margin-left: auto;
+}

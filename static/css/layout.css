@@ -1,0 +1,32 @@
+body {
+    margin: 0;
+    padding: var(--spacing-lg);
+    background-color: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    font-family: var(--font-family);
+    font-size: var(--font-size-base);
+}
+
+header {
+    margin-bottom: var(--spacing-lg);
+}
+
+h1 {
+    text-align: center;
+    color: var(--color-automation);
+    font-size: var(--font-size-lg);
+    margin: 0;
+}
+
+.container {
+    max-width: 100%;
+    overflow-x: auto;
+    background-color: var(--color-bg-secondary);
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-md);
+}
+
+.loading {
+    text-align: center;
+    color: var(--color-text-secondary);
+}

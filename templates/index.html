@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home Assistant Automation Workflow</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <header>
+        <h1>Home Assistant Automation Workflows</h1>
+    </header>
+
+    <div class="legend">
+        <div class="legend-item">
+            <span class="legend-color legend-automation"></span>
+            <span>Automation Name</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-color legend-trigger"></span>
+            <span>Trigger</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-color legend-condition"></span>
+            <span>Condition</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-color legend-action"></span>
+            <span>Action</span>
+        </div>
+        <button class="refresh-btn" id="manualRefresh">Refresh Now</button>
+        <span class="status" id="status">Loading...</span>
+    </div>
+
+    <div class="container" id="diagramContainer">
+        <p class="loading">Loading diagram...</p>
+    </div>
+
+    <script>
+        const REFRESH_INTERVAL = {{ refresh_interval }} * 1000;
+    </script>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
